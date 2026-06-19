@@ -3,7 +3,6 @@ import 'package:google_fonts/google_fonts.dart';
 import '../theme/app_theme.dart';
 import '../models/models.dart';
 import '../widgets/widgets.dart';
-import 'home_screen.dart';
 
 // Écran d'historique et notifications. Contient des filtres et la liste
 // des transactions. Les widgets sont commentés pour faciliter la lecture.
@@ -84,7 +83,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
                                   style: GoogleFonts.nunito(
                                       fontSize: 12,
                                       fontWeight: FontWeight.w700,
-                                      color: _filter == f ? AppColors.primary : Colors.white.withOpacity(0.6))),
+                                      color: _filter == f ? AppColors.primary : Colors.white.withValues(alpha: 0.6))),
                             ),
                           ))
                       .toList()),
@@ -160,7 +159,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
                 width: 42,
                 height: 42,
                 decoration: BoxDecoration(
-                    color: AppColors.operatorColor(t.operator).withOpacity(0.1),
+                    color: AppColors.operatorColor(t.operator).withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(12)),
                 child: Center(child: Text(t.serviceIcon, style: const TextStyle(fontSize: 18)))),
             const SizedBox(width: 12),
@@ -225,7 +224,12 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
   String _activeTab = 'Tout';
   final tabs = ['Tout', 'Réussies', 'Échecs', 'Informations'];
 
-  void _markAll() => setState(() => widget.notifications.forEach((n) => n.read = true));
+  void _markAll() {
+    for (final n in widget.notifications) {
+      n.read = true;
+    }
+    setState(() {});
+  }
 
   Color _typeColor(String type) {
     switch (type) {
@@ -297,7 +301,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                     child: Text('Tout effacer',
                         style: GoogleFonts.nunito(
                             fontSize: 12,
-                            color: Colors.white.withOpacity(0.7),
+                            color: Colors.white.withValues(alpha: 0.7),
                             fontWeight: FontWeight.w700))),
               ]),
               const SizedBox(height: 16),
@@ -338,7 +342,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                         decoration: BoxDecoration(
                           color: isActive ? AppColors.primary : Colors.white,
                           borderRadius: BorderRadius.circular(999),
-                          border: Border.all(color: isActive ? Colors.transparent : AppColors.textHint.withOpacity(0.3)),
+                          border: Border.all(color: isActive ? Colors.transparent : AppColors.textHint.withValues(alpha: 0.3)),
                         ),
                         child: Text(tab,
                             style: GoogleFonts.nunito(
@@ -371,8 +375,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
             ),
           )
         else
-          ...groups.entries.expand<Widget>((entry) {
-            return [
+          for (final entry in groups.entries) ...[
               SliverToBoxAdapter(
                 child: Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
@@ -396,11 +399,17 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                             MaterialPageRoute(
                                 builder: (_) => NotifDetailScreen(notification: n)));
                       },
+                      // ⚠️ RÈGLE FLUTTER IMPORTANTE :
+                      // On ne peut PAS avoir à la fois 'color:' ET 'decoration:' sur un Container.
+                      // Solution : mettre la couleur DANS BoxDecoration (paramètre color:).
                       child: Container(
-                        color: n.read ? Colors.white : const Color(0xFFF8FFF9),
                         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
-                        decoration: const BoxDecoration(
-                            border: Border(bottom: BorderSide(color: Color(0xFFEEEEEE)))),
+                        decoration: BoxDecoration(
+                          // Fond légèrement vert si non lu, blanc si déjà lu
+                          color: n.read ? Colors.white : const Color(0xFFF8FFF9),
+                          // Séparateur fin en bas de chaque notification
+                          border: const Border(bottom: BorderSide(color: Color(0xFFEEEEEE))),
+                        ),
                         child: Row(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
@@ -416,7 +425,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                                 width: 42,
                                 height: 42,
                                 decoration: BoxDecoration(
-                                    color: color.withOpacity(0.15),
+                                    color: color.withValues(alpha: 0.15),
                                     borderRadius: BorderRadius.circular(12)),
                                 child: Center(child: Text(n.icon, style: const TextStyle(fontSize: 20))),
                               ),
@@ -452,8 +461,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                   childCount: entry.value.length,
                 ),
               ),
-            ];
-          }).toList(),
+            ],
         const SliverToBoxAdapter(child: SizedBox(height: 100)),
       ]),
     );
@@ -612,6 +620,141 @@ class NotifDetailScreen extends StatelessWidget {
                 fontSize: 12,
                 fontWeight: FontWeight.w900,
                 color: color ?? AppColors.textPrimary)),
+      ]),
+    );
+  }
+}
+
+// ─── Détail d'une transaction (depuis l'historique) ────────────────────────────
+class TransactionDetailScreen extends StatelessWidget {
+  final Transaction transaction;
+  const TransactionDetailScreen({super.key, required this.transaction});
+
+  String _opImage(String op) {
+    if (op == 'MTN') return 'assets/images/mtn.jpg';
+    if (op == 'Moov') return 'assets/images/moov.jpeg';
+    return 'assets/images/Orange_logo.png';
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final t = transaction;
+    final date = '${t.date.day.toString().padLeft(2, '0')}/${t.date.month.toString().padLeft(2, '0')}/${t.date.year}';
+    final heure = '${t.date.hour.toString().padLeft(2, '0')}:${t.date.minute.toString().padLeft(2, '0')}';
+    final opLogo = ClipRRect(
+      borderRadius: BorderRadius.circular(6),
+      child: Image.asset(_opImage(t.operator), width: 24, height: 24, fit: BoxFit.cover),
+    );
+
+    return Scaffold(
+      backgroundColor: Colors.white,
+      appBar: AppBar(
+        backgroundColor: Colors.white,
+        elevation: 0,
+        surfaceTintColor: Colors.white,
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back_rounded, color: AppColors.primary),
+          onPressed: () => Navigator.pop(context),
+        ),
+        centerTitle: true,
+        title: Text('Détail transaction',
+            style: GoogleFonts.nunito(fontSize: 17, fontWeight: FontWeight.w900, color: AppColors.textPrimary)),
+      ),
+      body: SingleChildScrollView(
+        padding: const EdgeInsets.all(16),
+        child: Column(children: [
+          // Badge statut
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.symmetric(vertical: 20),
+            decoration: BoxDecoration(
+              color: t.status == 'ok' ? AppColors.primaryLight : const Color(0xFFFFF3F3),
+              borderRadius: BorderRadius.circular(16),
+            ),
+            child: Column(children: [
+              Container(
+                width: 56, height: 56,
+                decoration: BoxDecoration(
+                  color: t.status == 'ok' ? AppColors.primary : AppColors.red,
+                  shape: BoxShape.circle,
+                ),
+                child: Center(child: Icon(
+                  t.status == 'ok' ? Icons.check_rounded : Icons.close_rounded,
+                  color: Colors.white, size: 30,
+                )),
+              ),
+              const SizedBox(height: 12),
+              Text(
+                t.status == 'ok' ? 'Transaction réussie' : 'Transaction échouée',
+                style: GoogleFonts.nunito(
+                    fontSize: 18, fontWeight: FontWeight.w900,
+                    color: t.status == 'ok' ? AppColors.primary : AppColors.red),
+              ),
+            ]),
+          ),
+          const SizedBox(height: 16),
+          TolCard(
+            padding: EdgeInsets.zero,
+            child: Column(children: [
+              _row('Référence', t.id, AppColors.primary),
+              _rowWidget(opLogo, 'Opérateur', t.operator, AppColors.operatorColor(t.operator)),
+              _row('Service', t.service, AppColors.blue),
+              _row('Type d\'opération', t.operation, AppColors.primary),
+              _row('Numéro', t.phone, null),
+              _row('Montant', '${t.amount} FCFA', null),
+              _row('Moyen de paiement', t.paymentMethod, AppColors.orange),
+              _row('Date', date, null),
+              _row('Heure', heure, null),
+              _row('Statut', t.status == 'ok' ? 'Réussie' : 'Échouée',
+                  t.status == 'ok' ? AppColors.primary : AppColors.red, last: true),
+            ]),
+          ),
+          const SizedBox(height: 20),
+          SizedBox(
+            width: double.infinity, height: 52,
+            child: ElevatedButton(
+              onPressed: () => Navigator.pop(context),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.primary,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                elevation: 0,
+              ),
+              child: Text('Fermer',
+                  style: GoogleFonts.nunito(fontSize: 15, fontWeight: FontWeight.w900, color: Colors.white)),
+            ),
+          ),
+        ]),
+      ),
+    );
+  }
+
+  Widget _row(String key, String val, Color? color, {bool last = false}) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      decoration: BoxDecoration(
+          border: last ? null : const Border(bottom: BorderSide(color: Color(0xFFF0F0F0)))),
+      child: Row(children: [
+        Expanded(child: Text(key, style: GoogleFonts.nunito(
+            fontSize: 12, color: AppColors.textSecondary, fontWeight: FontWeight.w600))),
+        Text(val, style: GoogleFonts.nunito(
+            fontSize: 12, fontWeight: FontWeight.w900,
+            color: color ?? AppColors.textPrimary)),
+      ]),
+    );
+  }
+
+  Widget _rowWidget(Widget leading, String key, String val, Color? color) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      decoration: const BoxDecoration(border: Border(bottom: BorderSide(color: Color(0xFFF0F0F0)))),
+      child: Row(children: [
+        leading,
+        const SizedBox(width: 8),
+        Expanded(child: Text(key, style: GoogleFonts.nunito(
+            fontSize: 12, color: AppColors.textSecondary, fontWeight: FontWeight.w600))),
+        Text(val, style: GoogleFonts.nunito(
+            fontSize: 12, fontWeight: FontWeight.w900,
+            color: color ?? AppColors.textPrimary)),
       ]),
     );
   }

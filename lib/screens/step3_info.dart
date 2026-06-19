@@ -91,7 +91,7 @@ class _Step3InfoScreenState extends State<Step3InfoScreen> {
                             width: 38,
                             height: 38,
                             decoration: BoxDecoration(
-                                color: _bannerColor.withOpacity(0.15),
+                                color: _bannerColor.withValues(alpha: 0.15),
                                 shape: BoxShape.circle),
                             child: Center(
                                 child: Text(_bannerIcon,
@@ -268,7 +268,7 @@ class _Step3InfoScreenState extends State<Step3InfoScreen> {
     );
   }
 
-  bool get _isTiers2 => widget.operation.contains('tiers');
+
 
   void _showCustomAmtDialog() {
     // Affiche une boîte de dialogue pour saisir un montant personnalisé.
@@ -322,6 +322,14 @@ class _Step3InfoScreenState extends State<Step3InfoScreen> {
     if (_phoneCtrl.text.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(
         content: Text('Veuillez entrer un numéro', style: GoogleFonts.nunito()),
+        backgroundColor: AppColors.red,
+      ));
+      return;
+    }
+    // Validation format ivoirien : 10 chiffres (07XXXXXXXX, 05XXXXXXXX, etc.)
+    if (_phoneCtrl.text.length != 10) {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text('Le numéro doit contenir 10 chiffres', style: GoogleFonts.nunito()),
         backgroundColor: AppColors.red,
       ));
       return;

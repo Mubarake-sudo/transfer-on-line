@@ -2,15 +2,15 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../theme/app_theme.dart';
 import '../models/models.dart';
-import '../widgets/widgets.dart';
-import 'step1_operator.dart';
-import 'history_screen.dart';
+import '../services/transaction_service.dart';
+import 'step2_service.dart';
 import 'notifications_screen.dart';
-import 'profile_screen.dart';
 
-// Écran principal (tableau de bord) — affiche le solde, actions rapides
-// et les transactions récentes. Les commentaires sont en français pour
-// aider les débutants à comprendre la structure.
+// ═══════════════════════════════════════════════════════════════════════════
+//  HOME SCREEN — Écran principal de l'application
+//  • Tab 0 : Landing plein écran sombre SANS barre de navigation (mockup)
+//  • Tab 1–4 : Autres onglets AVEC barre de navigation en bas
+// ═══════════════════════════════════════════════════════════════════════════
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -20,35 +20,64 @@ class HomeScreen extends StatefulWidget {
 }
 
 class _HomeScreenState extends State<HomeScreen> {
+  // Onglet actif (0 = landing, 1 = historique, 3 = notifs, 4 = profil)
   int _tab = 0;
+
+  // Listes des transactions et notifications chargées localement
   List<Transaction> txns = List.from(sampleTransactions);
   List<AppNotification> notifs = List.from(sampleNotifications);
 
-  // Ajoute une transaction en tête de la liste et met à jour l'UI.
+  @override
+  void initState() {
+    super.initState();
+    // Charge les transactions sauvegardées depuis l'appareil
+    _loadTransactions();
+  }
+
+  // Charge les transactions persistées (stockage local)
+  Future<void> _loadTransactions() async {
+    final saved = await TransactionService.load();
+    if (saved.isNotEmpty && mounted) {
+      setState(() => txns = saved); // Met à jour l'interface
+    }
+  }
+
+  // Ajoute une nouvelle transaction et sauvegarde la liste
   void _addTransaction(Transaction t) {
-    setState(() => txns.insert(0, t));
+    setState(() => txns.insert(0, t)); // Insère en tête de liste
+    TransactionService.save(txns);     // Sauvegarde sur l'appareil
   }
 
   @override
   Widget build(BuildContext context) {
+    // ── Tab 0 : landing plein écran SANS bottom nav ──────────────────────
+    if (_tab == 0) {
+      return Scaffold(
+        // Fond transparent car le gradient est géré dans _buildLanding()
+        backgroundColor: Colors.transparent,
+        body: _buildLanding(),
+      );
+    }
+
+    // ── Tabs 1–4 : shell avec bottom nav ─────────────────────────────────
     final tabs = [
-      _buildHome(),
+      const SizedBox(), // Tab 0 (jamais atteint ici)
       HistoryScreen(transactions: txns),
-      const SizedBox(),
+      const SizedBox(), // Tab 2 : bouton "+"
       NotificationsScreen(notifications: notifs),
       ProfileScreen(),
     ];
 
     return Scaffold(
+      backgroundColor: AppColors.background,
       body: tabs[_tab],
       bottomNavigationBar: _buildNavBar(),
-      floatingActionButton: _tab == 2 ? null : null,
     );
   }
 
+  // ─── Barre de navigation (affichée uniquement sur les tabs 1-4) ─────────
   Widget _buildNavBar() {
-    // Barre de navigation inférieure personnalisée : change d'onglet
-    // ou ouvre l'écran de création d'opération (item index 2).
+    // Liste des onglets : icône + label
     final items = [
       {'icon': Icons.home_rounded, 'label': 'Accueil'},
       {'icon': Icons.receipt_long_rounded, 'label': 'Historique'},
@@ -56,6 +85,8 @@ class _HomeScreenState extends State<HomeScreen> {
       {'icon': Icons.notifications_rounded, 'label': 'Notifs'},
       {'icon': Icons.person_rounded, 'label': 'Profil'},
     ];
+
+    // Nombre de notifications non lues (pour le badge rouge)
     final unread = notifs.where((n) => !n.read).length;
 
     return Container(
@@ -70,16 +101,15 @@ class _HomeScreenState extends State<HomeScreen> {
           child: Row(
             children: List.generate(items.length, (i) {
               final isActive = _tab == i;
+              final activeColor = AppColors.primary;
+              final inactiveColor = const Color(0xFFAAAAAA);
+
               return Expanded(
                 child: GestureDetector(
                   onTap: () {
                     if (i == 2) {
-                      Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (_) => Step1OperatorScreen(
-                                onTransactionAdded: _addTransaction),
-                          ));
+                      // Le bouton "+" ramène au landing (tab 0)
+                      setState(() => _tab = 0);
                     } else {
                       setState(() => _tab = i);
                     }
@@ -91,56 +121,48 @@ class _HomeScreenState extends State<HomeScreen> {
                       Stack(
                         clipBehavior: Clip.none,
                         children: [
-                          AnimatedContainer(
-                            duration: const Duration(milliseconds: 200),
-                            child: Icon(
-                              items[i]['icon'] as IconData,
-                              size: i == 2 ? 32 : 24,
-                              color: isActive
-                                  ? AppColors.primary
-                                  : (i == 2
-                                      ? AppColors.primary
-                                      : const Color(0xFFAAAAAA)),
-                            ),
+                          Icon(
+                            items[i]['icon'] as IconData,
+                            size: i == 2 ? 32 : 24,
+                            color: isActive
+                                ? activeColor
+                                : (i == 2 ? activeColor : inactiveColor),
                           ),
+                          // Badge rouge pour les notifications non lues
                           if (i == 3 && unread > 0)
                             Positioned(
-                              top: -4,
-                              right: -6,
+                              top: -4, right: -6,
                               child: Container(
-                                width: 16,
-                                height: 16,
+                                width: 16, height: 16,
                                 decoration: const BoxDecoration(
-                                    color: Colors.red, shape: BoxShape.circle),
+                                    color: Colors.red,
+                                    shape: BoxShape.circle),
                                 child: Center(
-                                    child: Text('$unread',
-                                        style: GoogleFonts.nunito(
-                                            fontSize: 9,
-                                            fontWeight: FontWeight.w900,
-                                            color: Colors.white))),
+                                  child: Text('$unread',
+                                      style: GoogleFonts.nunito(
+                                          fontSize: 9,
+                                          fontWeight: FontWeight.w900,
+                                          color: Colors.white)),
+                                ),
                               ),
                             ),
                         ],
                       ),
+                      // Label (sauf pour le bouton central "+")
                       if (i != 2) ...[
-                        const SizedBox(height: 3),
-                        Text(
-                          items[i]['label'] as String,
-                          style: GoogleFonts.nunito(
-                            fontSize: 10,
-                            fontWeight: FontWeight.w700,
-                            color: isActive
-                                ? AppColors.primary
-                                : const Color(0xFFAAAAAA),
-                          ),
-                        ),
+                        const SizedBox(height: 2),
+                        Text(items[i]['label'] as String,
+                            style: GoogleFonts.nunito(
+                                fontSize: 10,
+                                fontWeight: FontWeight.w700,
+                                color: isActive ? activeColor : inactiveColor)),
                       ],
+                      // Petit point sous l'onglet actif
                       if (isActive && i != 2)
                         Container(
-                            width: 5,
-                            height: 5,
-                            decoration: const BoxDecoration(
-                                color: AppColors.primary,
+                            width: 5, height: 5,
+                            decoration: BoxDecoration(
+                                color: activeColor,
                                 shape: BoxShape.circle)),
                     ],
                   ),
@@ -153,608 +175,389 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  Widget _buildHome() {
-    // Page d'accueil principale : header, solde, opérateurs, actions et
-    // transactions récentes. Le total affiché agrège les transactions réussies.
-    final totalOk =
-        txns.where((t) => t.status == 'ok').fold(0, (a, t) => a + t.amount);
+  // ═══════════════════════════════════════════════════════════════════════
+  //  TAB 0 : LANDING DARK — Correspond exactement au mockup Screen 1
+  // ═══════════════════════════════════════════════════════════════════════
+  Widget _buildLanding() {
+    // Nombre de notifications non lues pour le badge
     final unread = notifs.where((n) => !n.read).length;
 
-    return Scaffold(
-      backgroundColor: const Color(0xFF061A0E),
-      body: CustomScrollView(
-        slivers: [
-          SliverToBoxAdapter(child: _buildHomeTop(unread)),
-          SliverToBoxAdapter(child: _buildBalanceCard(totalOk)),
-          SliverToBoxAdapter(child: _buildOperators()),
-          SliverToBoxAdapter(child: _buildQuickActions()),
-          SliverToBoxAdapter(child: _buildRecentTransactions()),
-          const SliverToBoxAdapter(child: SizedBox(height: 20)),
-        ],
+    return Container(
+      // ── Fond dégradé sombre (vert profond comme le mockup) ──────────────
+      width: double.infinity,
+      height: double.infinity,
+      decoration: const BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+          colors: [
+            Color(0xFF031A0A), // Vert très sombre (presque noir)
+            Color(0xFF062E14), // Vert sombre
+            Color(0xFF0A4020), // Vert moyen
+            Color(0xFF062E14), // Vert sombre (retour)
+            Color(0xFF031A0A), // Vert très sombre
+          ],
+          stops: [0.0, 0.2, 0.5, 0.8, 1.0],
+        ),
       ),
-    );
-  }
-
-  Widget _buildHomeTop(int unread) {
-    return Padding(
-      padding: EdgeInsets.only(
-          top: MediaQuery.of(context).padding.top + 12,
-          left: 20,
-          right: 20,
-          bottom: 16),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Text("Bonjour 👋",
-                style: GoogleFonts.nunito(
-                    fontSize: 12,
-                    color: Colors.white54,
-                    fontWeight: FontWeight.w600)),
-            Text("Konan Yves",
-                style: GoogleFonts.nunito(
-                    fontSize: 20,
-                    color: Colors.white,
-                    fontWeight: FontWeight.w900)),
-          ]),
-          Row(children: [
-            _iconBtn(Icons.notifications_rounded,
-                onTap: () => setState(() => _tab = 3), badge: unread),
-            const SizedBox(width: 10),
-            _iconBtn(Icons.settings_rounded,
-                onTap: () => setState(() => _tab = 4)),
-          ]),
-        ],
-      ),
-    );
-  }
-
-  Widget _iconBtn(IconData icon, {required VoidCallback onTap, int badge = 0}) {
-    // Petit bouton circulaire réutilisable (badge optionnel).
-    return GestureDetector(
-      onTap: onTap,
-      child: Stack(
-        clipBehavior: Clip.none,
-        children: [
-          Container(
-            width: 40,
-            height: 40,
-            decoration: BoxDecoration(
-                color: Colors.white12, borderRadius: BorderRadius.circular(12)),
-            child: Icon(icon, color: Colors.white, size: 20),
-          ),
-          if (badge > 0)
-            Positioned(
-              top: -4,
-              right: -4,
-              child: Container(
-                width: 16,
-                height: 16,
-                decoration: const BoxDecoration(
-                    color: Colors.red, shape: BoxShape.circle),
-                child: Center(
-                    child: Text('$badge',
-                        style: GoogleFonts.nunito(
-                            fontSize: 9,
-                            fontWeight: FontWeight.w900,
-                            color: Colors.white))),
+      child: SafeArea(
+        child: Column(
+          children: [
+            // ── Icône de notification (coin haut droite) ─────────────────
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 10, 16, 0),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.end,
+                children: [
+                  GestureDetector(
+                    // Tap → aller à l'onglet Notifications (tab 3)
+                    onTap: () => setState(() => _tab = 3),
+                    child: Container(
+                      width: 44, height: 44,
+                      decoration: BoxDecoration(
+                        color: Colors.white.withValues(alpha: 0.08),
+                        shape: BoxShape.circle,
+                        border: Border.all(
+                            color: Colors.white.withValues(alpha: 0.18)),
+                      ),
+                      child: Stack(
+                        clipBehavior: Clip.none,
+                        children: [
+                          const Center(
+                              child: Icon(Icons.notifications_outlined,
+                                  color: Colors.white, size: 22)),
+                          // Badge rouge si notifications non lues
+                          if (unread > 0)
+                            Positioned(
+                              top: 6, right: 6,
+                              child: Container(
+                                width: 16, height: 16,
+                                decoration: const BoxDecoration(
+                                    color: Colors.red,
+                                    shape: BoxShape.circle),
+                                child: Center(
+                                    child: Text('$unread',
+                                        style: GoogleFonts.nunito(
+                                            fontSize: 8,
+                                            color: Colors.white,
+                                            fontWeight: FontWeight.w900))),
+                              ),
+                            ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
               ),
             ),
-        ],
-      ),
-    );
-  }
 
-  Widget _buildBalanceCard(int total) {
-    // Carte qui affiche le total des transactions du mois et boutons
-    // rapides pour créer une opération ou accéder à l'historique.
-    return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 20),
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        gradient: const LinearGradient(
-            colors: [Color(0xFF1A6E35), Color(0xFF0D4A22)],
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight),
-        borderRadius: BorderRadius.circular(20),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text("Total transactions ce mois",
+            const Spacer(flex: 1),
+
+            // ── Logo circulaire avec flèche de transfert ─────────────────
+            // Cercle extérieur orange, icône sync (flèche) verte à l'intérieur
+            Container(
+              width: 90, height: 90,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                // Contour orange visible
+                border: Border.all(color: AppColors.orange, width: 3),
+              ),
+              child: Center(
+                child: Container(
+                  width: 70, height: 70,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: Colors.white.withValues(alpha: 0.06),
+                  ),
+                  // Icône de synchronisation (flèches qui tournent)
+                  child: const Icon(
+                      Icons.sync_rounded,
+                      color: AppColors.success, // Vert
+                      size: 44),
+                ),
+              ),
+            ),
+
+            const SizedBox(height: 16),
+
+            // ── Titre principal "TRANSFER ON LINE" ───────────────────────
+            Text(
+              'TRANSFER',
               style: GoogleFonts.nunito(
-                  fontSize: 12,
+                fontSize: 34,
+                fontWeight: FontWeight.w900,
+                color: Colors.white,
+                letterSpacing: 1.5,
+              ),
+            ),
+            Text(
+              'ON LINE',
+              style: GoogleFonts.nunito(
+                fontSize: 34,
+                fontWeight: FontWeight.w900,
+                color: AppColors.success, // Vert vif
+                letterSpacing: 1.5,
+              ),
+            ),
+
+            const SizedBox(height: 8),
+
+            // ── Sous-titre descriptif ─────────────────────────────────────
+            Text(
+              'Souscrivez ou transférez\nvos forfaits en toute simplicité',
+              style: GoogleFonts.nunito(
+                  fontSize: 13,
                   color: Colors.white60,
-                  fontWeight: FontWeight.w700)),
-          const SizedBox(height: 6),
-          RichText(
-              text: TextSpan(children: [
-            TextSpan(
-                text: '${_fmtAmt(total)} ',
-                style: GoogleFonts.nunito(
-                    fontSize: 32,
-                    fontWeight: FontWeight.w900,
-                    color: Colors.white)),
-            TextSpan(
-                text: 'FCFA',
-                style: GoogleFonts.nunito(fontSize: 16, color: Colors.white70)),
-          ])),
-          const SizedBox(height: 4),
-          Text(
-              "${txns.length} opérations · ${txns.where((t) => t.status == 'ok').length} réussies",
-              style: GoogleFonts.nunito(
-                  fontSize: 11, color: Colors.white.withOpacity(0.5))),
-          const SizedBox(height: 16),
-          Row(children: [
-            Expanded(
-                child: _balBtn("➕ Nouvelle opération", onTap: () {
-              Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                      builder: (_) => Step1OperatorScreen(
-                          onTransactionAdded: _addTransaction)));
-            })),
-            const SizedBox(width: 10),
-            Expanded(
-                child: _balBtn("📋 Historique",
-                    onTap: () => setState(() => _tab = 1))),
-          ]),
-        ],
-      ),
-    );
-  }
-
-  Widget _balBtn(String label, {required VoidCallback onTap}) =>
-      GestureDetector(
-        onTap: onTap,
-        child: Container(
-          padding: const EdgeInsets.symmetric(vertical: 8),
-          decoration: BoxDecoration(
-              color: Colors.white24, borderRadius: BorderRadius.circular(10)),
-          child: Center(
-              child: Text(label,
-                  style: GoogleFonts.nunito(
-                      fontSize: 12,
-                      fontWeight: FontWeight.w800,
-                      color: Colors.white))),
-        ),
-      );
-
-  Widget _buildOperators() {
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(20, 20, 20, 0),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
-            Text("Opérateurs",
-                style: GoogleFonts.nunito(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w800,
-                    color: Colors.white70)),
-            GestureDetector(
-              onTap: () => Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                      builder: (_) => Step1OperatorScreen(
-                          onTransactionAdded: _addTransaction))),
-              child: Text("Voir tout →",
-                  style: GoogleFonts.nunito(
-                      fontSize: 12,
-                      fontWeight: FontWeight.w700,
-                      color: const Color(0xFF4ADE80))),
+                  height: 1.5),
+              textAlign: TextAlign.center,
             ),
-          ]),
-          const SizedBox(height: 12),
-          SingleChildScrollView(
-            scrollDirection: Axis.horizontal,
-            child: Row(
-              children: ['Orange', 'MTN', 'Moov']
-                  .map((op) => GestureDetector(
-                        onTap: () => Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (_) => Step1OperatorScreen(
-                                  onTransactionAdded: _addTransaction,
-                                  preselectedOp: op),
-                            )),
-                        child: Container(
-                          margin: const EdgeInsets.only(right: 12),
-                          padding: const EdgeInsets.symmetric(
-                              horizontal: 20, vertical: 16),
-                          decoration: BoxDecoration(
-                            color:
-                                AppColors.operatorColor(op).withOpacity(0.15),
-                            borderRadius: BorderRadius.circular(16),
-                            border: Border.all(
-                                color: AppColors.operatorColor(op)
-                                    .withOpacity(0.3)),
-                          ),
-                          child: Column(children: [
-                            _opLogo(op),
-                            const SizedBox(height: 8),
-                            Text(op,
-                                style: GoogleFonts.nunito(
-                                    fontSize: 13,
-                                    fontWeight: FontWeight.w800,
-                                    color: Colors.white)),
-                          ]),
-                        ),
-                      ))
-                  .toList(),
+
+            const Spacer(flex: 1),
+
+            // ── 3 icônes de services (Téléphone, Internet, SMS) ──────────
+            // Chaque icône a un fond vert flou (effet glow)
+            Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                // Icône Téléphone — on inverse les couleurs car fond blanc
+                _glowIcon(
+                  'assets/images/telephone.png',
+                  fallbackIcon: Icons.phone,
+                  invertColors: true, // Transforme noir → blanc
+                ),
+                const SizedBox(width: 28),
+                // Icône Internet (globe)
+                _glowIcon(
+                  'assets/images/internet.png',
+                  fallbackIcon: Icons.language,
+                ),
+                const SizedBox(width: 28),
+                // Icône SMS
+                _glowIcon(
+                  'assets/images/sms.png',
+                  fallbackIcon: Icons.sms,
+                ),
+              ],
             ),
-          ),
-        ],
-      ),
-    );
-  }
 
-  Widget _opLogo(String op) {
-    return Container(
-      width: 48,
-      height: 48,
-      decoration: BoxDecoration(
-        color: op == 'Moov'
-            ? AppColors.moov
-            : op == 'MTN'
-                ? AppColors.mtn
-                : AppColors.orange,
-        borderRadius: BorderRadius.circular(14),
-      ),
-      child: Center(
-          child: Text(op == 'Orange' ? 'o' : op,
-              style: GoogleFonts.nunito(
-                  fontSize: op == 'MTN' ? 13 : 10,
-                  fontWeight: FontWeight.w900,
-                  color: Colors.white))),
-    );
-  }
+            const Spacer(flex: 1),
 
-  Widget _buildQuickActions() {
-    final actions = [
-      {'icon': '📱', 'label': 'Internet'},
-      {'icon': '📞', 'label': 'Appels'},
-      {'icon': '💬', 'label': 'SMS'},
-      {'icon': '🔄', 'label': 'Transférer'},
-    ];
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(20, 20, 20, 0),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text("Actions rapides",
+            // ── Label avant les opérateurs ───────────────────────────────
+            Text(
+              'Choisissez votre opérateur',
               style: GoogleFonts.nunito(
                   fontSize: 14,
-                  fontWeight: FontWeight.w800,
-                  color: Colors.white70)),
-          const SizedBox(height: 12),
-          Row(
-            children: actions
-                .map((a) => Expanded(
-                      child: GestureDetector(
-                        onTap: () => Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                                builder: (_) => Step1OperatorScreen(
-                                    onTransactionAdded: _addTransaction))),
-                        child: Container(
-                          margin: EdgeInsets.only(
-                              right: a == actions.last ? 0 : 10),
-                          padding: const EdgeInsets.symmetric(vertical: 14),
-                          decoration: BoxDecoration(
-                            color: Colors.white.withOpacity(0.07),
-                            borderRadius: BorderRadius.circular(14),
-                            border: Border.all(
-                                color: Colors.white.withOpacity(0.1)),
-                          ),
-                          child: Column(children: [
-                            Text(a['icon']!,
-                                style: const TextStyle(fontSize: 22)),
-                            const SizedBox(height: 6),
-                            Text(a['label']!,
-                                style: GoogleFonts.nunito(
-                                    fontSize: 10,
-                                    fontWeight: FontWeight.w700,
-                                    color: Colors.white.withOpacity(0.6)),
-                                textAlign: TextAlign.center),
-                          ]),
-                        ),
-                      ),
-                    ))
-                .toList(),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildRecentTransactions() {
-    return Container(
-      margin: const EdgeInsets.only(top: 20),
-      decoration: const BoxDecoration(
-        color: Color(0xFFF0F2F5),
-        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-      ),
-      padding: const EdgeInsets.all(20),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
-            Text("Transactions récentes",
-                style: GoogleFonts.nunito(
-                    fontSize: 15,
-                    fontWeight: FontWeight.w900,
-                    color: AppColors.textPrimary)),
-            GestureDetector(
-              onTap: () => setState(() => _tab = 1),
-              child: Text("Tout voir →",
-                  style: GoogleFonts.nunito(
-                      fontSize: 12,
-                      fontWeight: FontWeight.w800,
-                      color: AppColors.primary)),
+                  fontWeight: FontWeight.w700,
+                  color: Colors.white70),
             ),
-          ]),
-          const SizedBox(height: 14),
-          ...txns.take(4).map((t) => _txnItem(t)),
-        ],
-      ),
-    );
-  }
+            const SizedBox(height: 14),
 
-  Widget _txnItem(Transaction t) {
-    return GestureDetector(
-      onTap: () => Navigator.push(
-          context,
-          MaterialPageRoute(
-              builder: (_) => TransactionDetailScreen(transaction: t))),
-      child: Container(
-        padding: const EdgeInsets.symmetric(vertical: 12),
-        decoration: BoxDecoration(
-            border: Border(bottom: BorderSide(color: AppColors.divider))),
-        child: Row(children: [
-          Container(
-            width: 44,
-            height: 44,
-            decoration: BoxDecoration(
-                color: AppColors.operatorColor(t.operator).withOpacity(0.1),
-                borderRadius: BorderRadius.circular(14)),
-            child: Center(
-                child:
-                    Text(t.serviceIcon, style: const TextStyle(fontSize: 20))),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
+            // ── Cards des 3 opérateurs ───────────────────────────────────
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16),
               child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                Text('${t.operator} · ${t.service}',
-                    style: GoogleFonts.nunito(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w800,
-                        color: AppColors.textPrimary)),
-                Text('${t.operation} · ${_dateStr(t.date)}',
-                    style: GoogleFonts.nunito(
-                        fontSize: 11, color: AppColors.textSecondary)),
-                const SizedBox(height: 4),
-                StatusBadge(t.status),
-              ])),
-          Column(crossAxisAlignment: CrossAxisAlignment.end, children: [
-            Text('-${_fmtAmt(t.amount)}',
-                style: GoogleFonts.nunito(
-                    fontSize: 15,
-                    fontWeight: FontWeight.w900,
-                    color: AppColors.red)),
-            Text('FCFA',
-                style: GoogleFonts.nunito(
-                    fontSize: 10,
-                    fontWeight: FontWeight.w700,
-                    color: AppColors.textHint)),
-          ]),
-        ]),
-      ),
-    );
-  }
-
-  String _fmtAmt(int n) {
-    // Formatte un entier en chaîne lisible (ex: 1000 -> "1 000").
-    if (n >= 1000)
-      return '${(n / 1000).toStringAsFixed(n % 1000 == 0 ? 0 : 1)} 000';
-    return '$n';
-  }
-
-  String _dateStr(DateTime d) {
-    // Renvoie une représentation courte de la date : aujourd'hui, hier ou
-    // jour + mois (ex: 12 Jan).
-    final now = DateTime.now();
-    final diff = now.difference(d);
-    if (diff.inDays == 0)
-      return "Aujourd'hui ${d.hour.toString().padLeft(2, '0')}:${d.minute.toString().padLeft(2, '0')}";
-    if (diff.inDays == 1) return "Hier";
-    return "${d.day} ${[
-      'Jan',
-      'Fév',
-      'Mar',
-      'Avr',
-      'Mai',
-      'Jun',
-      'Jul',
-      'Aoû',
-      'Sep',
-      'Oct',
-      'Nov',
-      'Déc'
-    ][d.month - 1]}";
-  }
-}
-
-// ─── Transaction Detail Screen ────────────────────────────────────────────────
-class TransactionDetailScreen extends StatelessWidget {
-  final Transaction transaction;
-  const TransactionDetailScreen({super.key, required this.transaction});
-
-  @override
-  Widget build(BuildContext context) {
-    final t = transaction;
-    final isOk = t.status == 'ok';
-
-    return Scaffold(
-      backgroundColor: AppColors.background,
-      body: Column(children: [
-        Container(
-          decoration: const BoxDecoration(
-              gradient: LinearGradient(
-                  colors: [Color(0xFF0D5C2C), Color(0xFF1A7A3C)],
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight)),
-          padding: EdgeInsets.only(
-              top: MediaQuery.of(context).padding.top + 16,
-              bottom: 20,
-              left: 20,
-              right: 20),
-          child: Column(children: [
-            Row(children: [
-              GestureDetector(
-                onTap: () => Navigator.pop(context),
-                child: Container(
-                    width: 36,
-                    height: 36,
-                    decoration: BoxDecoration(
-                        color: Colors.white24,
-                        borderRadius: BorderRadius.circular(10)),
-                    child: const Icon(Icons.arrow_back_ios_new,
-                        color: Colors.white, size: 16)),
-              ),
-              const Expanded(
-                  child: Center(
-                      child: Text('Détail transaction',
-                          style: TextStyle(
-                              color: Colors.white,
-                              fontSize: 18,
-                              fontWeight: FontWeight.w900)))),
-              const SizedBox(width: 36),
-            ]),
-          ]),
-        ),
-        Expanded(
-            child: SingleChildScrollView(
-                padding: const EdgeInsets.all(16),
-                child: Column(children: [
-                  Container(
-                    padding: const EdgeInsets.all(24),
-                    decoration: BoxDecoration(
-                        color:
-                            isOk ? AppColors.primaryLight : AppColors.redLight,
-                        borderRadius: BorderRadius.circular(20)),
-                    child: Column(children: [
-                      Container(
-                          width: 64,
-                          height: 64,
-                          decoration: BoxDecoration(
-                              color: isOk ? AppColors.primary : AppColors.red,
-                              shape: BoxShape.circle),
-                          child: Center(
-                              child: Text(isOk ? '✅' : '❌',
-                                  style: const TextStyle(fontSize: 30)))),
-                      const SizedBox(height: 14),
-                      Text(isOk ? 'Transaction réussie' : 'Transaction échouée',
-                          style: GoogleFonts.nunito(
-                              fontSize: 20,
-                              fontWeight: FontWeight.w900,
-                              color: isOk ? AppColors.primary : AppColors.red)),
-                      const SizedBox(height: 4),
-                      Text(
-                          isOk
-                              ? 'Votre opération a été effectuée avec succès'
-                              : "Le paiement n'a pas pu être traité",
-                          style: GoogleFonts.nunito(
-                              fontSize: 13, color: AppColors.textSecondary),
-                          textAlign: TextAlign.center),
-                    ]),
+                children: [
+                  // Card Orange (fond orange, logo Orange)
+                  _operatorCard(
+                    name: 'Orange',
+                    bgColor: AppColors.orange,
+                    imagePath: 'assets/images/Orange_logo.png',
+                    logoWhiteBg: true, // Fond blanc derrière le logo
                   ),
-                  const SizedBox(height: 16),
-                  TolCard(
-                      padding: EdgeInsets.zero,
-                      child: Column(children: [
-                        _row('📋', 'Référence', t.id, AppColors.primary),
-                        _row('📡', 'Opérateur', t.operator,
-                            AppColors.operatorColor(t.operator)),
-                        _row('🌐', 'Service', t.service, AppColors.blue),
-                        _row('🔄', 'Opération', t.operation, AppColors.primary),
-                        _row('📞', 'Numéro', t.phone, null),
-                        _row('💲', 'Montant', '${t.amount} FCFA', null),
-                        _row('💳', 'Paiement', t.paymentMethod,
-                            AppColors.orange),
-                        _row(
-                            '📅',
-                            'Date',
-                            '${t.date.day}/${t.date.month}/${t.date.year}',
-                            null),
-                        _row(
-                            '🕐',
-                            'Heure',
-                            '${t.date.hour.toString().padLeft(2, '0')}:${t.date.minute.toString().padLeft(2, '0')}',
-                            null),
-                        _row('🛡️', 'Statut', t.statusLabel,
-                            isOk ? AppColors.primary : AppColors.red,
-                            last: true),
-                      ])),
-                  if (isOk) ...[
-                    const SizedBox(height: 16),
-                    Container(
-                      padding: const EdgeInsets.all(14),
-                      decoration: BoxDecoration(
-                          color: AppColors.blueLight,
-                          borderRadius: BorderRadius.circular(12)),
-                      child: Row(children: [
-                        Container(
-                            width: 26,
-                            height: 26,
-                            decoration: const BoxDecoration(
-                                color: AppColors.blue, shape: BoxShape.circle),
-                            child: const Center(
-                                child: Text('i',
-                                    style: TextStyle(
-                                        color: Colors.white,
-                                        fontWeight: FontWeight.w900,
-                                        fontSize: 12)))),
-                        const SizedBox(width: 10),
-                        Expanded(
-                            child: Text(
-                                'Votre forfait ${t.service} a été activé avec succès. Vous pouvez commencer à l\'utiliser immédiatement.',
-                                style: GoogleFonts.nunito(
-                                    fontSize: 12,
-                                    color: const Color(0xFF444444)))),
-                      ]),
-                    ),
-                  ],
-                ]))),
-      ]),
-    );
-  }
+                  const SizedBox(height: 12),
+                  // Card MTN (fond jaune/or, logo MTN)
+                  _operatorCard(
+                    name: 'MTN',
+                    bgColor: AppColors.mtn,
+                    imagePath: 'assets/images/mtn.jpg',
+                    logoWhiteBg: true,
+                  ),
+                  const SizedBox(height: 12),
+                  // Card Moov (fond bleu, logo Moov Africa)
+                  _operatorCard(
+                    name: 'Moov',
+                    bgColor: AppColors.moov,
+                    imagePath: 'assets/images/moov.jpeg',
+                    logoWhiteBg: false, // Pas de fond blanc (logo déjà coloré)
+                  ),
+                ],
+              ),
+            ),
 
-  Widget _row(String icon, String key, String val, Color? valColor,
-      {bool last = false}) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-      decoration: BoxDecoration(
-          border: last
-              ? null
-              : Border(bottom: const BorderSide(color: Color(0xFFF5F5F5)))),
-      child: Row(children: [
-        Text(icon, style: const TextStyle(fontSize: 16)),
-        const SizedBox(width: 10),
-        Expanded(
-            child: Text(key,
+            const Spacer(flex: 1),
+
+            // ── Badge de sécurité ─────────────────────────────────────────
+            Row(mainAxisAlignment: MainAxisAlignment.center, children: [
+              const Icon(Icons.verified_user_outlined,
+                  color: AppColors.success, size: 14),
+              const SizedBox(width: 6),
+              Text(
+                'Sécurisé à 100%',
                 style: GoogleFonts.nunito(
                     fontSize: 12,
-                    color: AppColors.textSecondary,
-                    fontWeight: FontWeight.w600))),
-        Text(val,
-            style: GoogleFonts.nunito(
-                fontSize: 12,
+                    fontWeight: FontWeight.w800,
+                    color: Colors.white70),
+              ),
+            ]),
+            const SizedBox(height: 3),
+            Text(
+              'Vos transactions sont protégées',
+              style: GoogleFonts.nunito(fontSize: 11, color: Colors.white38),
+            ),
+            const SizedBox(height: 10),
+
+            // ── Marque AFRITECH-CI ────────────────────────────────────────
+            Row(mainAxisAlignment: MainAxisAlignment.center, children: [
+              const Icon(Icons.shield_outlined,
+                  color: AppColors.success, size: 14),
+              const SizedBox(width: 6),
+              Text(
+                'AFRITECH-CI',
+                style: GoogleFonts.nunito(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w900,
+                    color: AppColors.success,
+                    letterSpacing: 2),
+              ),
+            ]),
+            const SizedBox(height: 16),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // ═══════════════════════════════════════════════════════════════════════
+  //  WIDGET : Icône service avec effet glow (halo vert autour)
+  // ═══════════════════════════════════════════════════════════════════════
+  Widget _glowIcon(
+    String imagePath, {
+    required IconData fallbackIcon, // Icône de secours si l'image ne charge pas
+    bool invertColors = false,       // Inverse noir↔blanc pour les images sombres
+  }) {
+    return Container(
+      width: 56, height: 56,
+      decoration: BoxDecoration(
+        // Fond vert semi-transparent
+        color: AppColors.success.withValues(alpha: 0.18),
+        shape: BoxShape.circle,
+        // Effet glow : ombre lumineuse verte autour du cercle
+        boxShadow: [
+          BoxShadow(
+            color: AppColors.success.withValues(alpha: 0.45),
+            blurRadius: 22,
+            spreadRadius: 4,
+          ),
+        ],
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(12),
+        child: invertColors
+            // ColorFiltered inverse les couleurs (utile pour logos noirs sur fond blanc)
+            ? ColorFiltered(
+                colorFilter: const ColorFilter.matrix([
+                  // Matrice d'inversion des couleurs RGB
+                  -1, 0, 0, 0, 255, // Rouge → inversé
+                   0,-1, 0, 0, 255, // Vert  → inversé
+                   0, 0,-1, 0, 255, // Bleu  → inversé
+                   0, 0, 0, 1, 0,   // Alpha → inchangé
+                ]),
+                child: Image.asset(
+                  imagePath,
+                  fit: BoxFit.contain,
+                  errorBuilder: (_, __, ___) => Icon(
+                    fallbackIcon,
+                    color: AppColors.success,
+                    size: 28,
+                  ),
+                ),
+              )
+            : Image.asset(
+                imagePath,
+                fit: BoxFit.contain,
+                errorBuilder: (_, __, ___) => Icon(
+                  fallbackIcon,
+                  color: AppColors.success,
+                  size: 28,
+                ),
+              ),
+      ),
+    );
+  }
+
+  // ═══════════════════════════════════════════════════════════════════════
+  //  WIDGET : Carte opérateur cliquable (Orange, MTN, Moov)
+  // ═══════════════════════════════════════════════════════════════════════
+  Widget _operatorCard({
+    required String name,       // Nom de l'opérateur
+    required Color bgColor,     // Couleur de fond de la carte
+    required String imagePath,  // Chemin de l'image du logo
+    bool logoWhiteBg = true,    // Fond blanc autour du logo ?
+  }) {
+    return GestureDetector(
+      // Au tap → naviguer vers l'écran de choix de service (Step 2)
+      onTap: () => Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (_) => Step2ServiceScreen(
+            operator: name,
+            onTransactionAdded: _addTransaction,
+          ),
+        ),
+      ),
+      child: Container(
+        height: 72, // Hauteur de la carte
+        decoration: BoxDecoration(
+          color: bgColor,
+          borderRadius: BorderRadius.circular(16), // Bords arrondis
+        ),
+        child: Row(children: [
+          const SizedBox(width: 12),
+
+          // ── Logo de l'opérateur ──────────────────────────────────────
+          Container(
+            width: 50, height: 50,
+            decoration: BoxDecoration(
+              // Fond blanc uniquement si demandé (Orange et MTN oui, Moov non)
+              color: logoWhiteBg ? Colors.white : Colors.transparent,
+              borderRadius: BorderRadius.circular(12),
+            ),
+            clipBehavior: Clip.antiAlias, // Coupe l'image aux bords du conteneur
+            child: Image.asset(
+              imagePath,
+              fit: BoxFit.contain,
+              // Si l'image ne charge pas, afficher une icône générique
+              errorBuilder: (_, __, ___) => const Icon(
+                Icons.business_rounded,
+                color: Colors.white,
+                size: 30,
+              ),
+            ),
+          ),
+
+          const SizedBox(width: 16),
+
+          // ── Nom de l'opérateur ───────────────────────────────────────
+          Expanded(
+            child: Text(
+              name,
+              style: GoogleFonts.nunito(
+                fontSize: 20,
                 fontWeight: FontWeight.w900,
-                color: valColor ?? AppColors.textPrimary)),
-      ]),
+                color: Colors.white,
+              ),
+            ),
+          ),
+
+          // ── Flèche droite (indique que c'est cliquable) ──────────────
+          const Icon(
+            Icons.arrow_forward_ios_rounded,
+            color: Colors.white,
+            size: 20,
+          ),
+          const SizedBox(width: 18),
+        ]),
+      ),
     );
   }
 }

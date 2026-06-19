@@ -131,15 +131,18 @@ class GreenHeader extends StatelessWidget {
                     ),
                   ),
                 ),
+              // Logo circulaire blanc (sync) — identique au mockup
               Container(
                 width: 52,
                 height: 52,
-                decoration: BoxDecoration(
-                  color: Colors.white24,
-                  borderRadius: BorderRadius.circular(16),
+                decoration: const BoxDecoration(
+                  color: Colors.white,
+                  shape: BoxShape.circle,
                 ),
-                child: Center(
-                    child: Text(icon, style: const TextStyle(fontSize: 24))),
+                child: const Center(
+                  child: Icon(Icons.sync_rounded,
+                      color: AppColors.success, size: 28),
+                ),
               ),
             ],
           ),
@@ -152,7 +155,7 @@ class GreenHeader extends StatelessWidget {
           const SizedBox(height: 4),
           Text(subtitle,
               style: GoogleFonts.nunito(
-                  fontSize: 13, color: Colors.white.withOpacity(0.6)),
+                  fontSize: 13, color: Colors.white.withValues(alpha: 0.6)),
               textAlign: TextAlign.center),
           const SizedBox(height: 18),
           StepProgressBar(currentStep: step),
@@ -330,9 +333,13 @@ class QuickAmountButton extends StatelessWidget {
     );
   }
 
-  String _fmt(int n) => n >= 1000
-      ? '${n ~/ 1000} ${n % 1000 == 0 ? "" : (n % 1000).toString().padLeft(3, "0")} '
-              .trim() +
-          (n >= 1000 ? ' 000' : '')
-      : '$n';
+  String _fmt(int n) {
+    if (n >= 1000) {
+      final thousands = n ~/ 1000;
+      final remainder = n % 1000;
+      if (remainder == 0) return '$thousands 000';
+      return '$thousands ${remainder.toString().padLeft(3, '0')}';
+    }
+    return '$n';
+  }
 }

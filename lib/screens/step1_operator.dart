@@ -1,331 +1,357 @@
+// ignore_for_file: use_build_context_synchronously
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:flutter_animate/flutter_animate.dart';
 import '../theme/app_theme.dart';
 import '../models/models.dart';
-import '../widgets/widgets.dart';
-import 'notifications_screen.dart';
 import 'step2_service.dart';
+import 'notifications_screen.dart';
 
-class Step1OperatorScreen extends StatefulWidget {
-  final Function(Transaction) onTransactionAdded;
-  final String? preselectedOp;
+// ─── Step 1 : Sélection de l'opérateur ───────────────────────────────────────
+// Écran d'accueil / landing page. L'utilisateur choisit son opérateur
+// pour lancer le flux de souscription ou de transfert.
 
+class Step1OperatorScreen extends StatelessWidget {
   const Step1OperatorScreen({
     super.key,
     required this.onTransactionAdded,
     this.preselectedOp,
   });
 
-  @override
-  State<Step1OperatorScreen> createState() => _Step1OperatorScreenState();
-}
+  final Function(Transaction) onTransactionAdded;
+  final String? preselectedOp;
 
-class _Step1OperatorScreenState extends State<Step1OperatorScreen> {
-  String? _selected;
-
-  @override
-  void initState() {
-    super.initState();
-    _selected = widget.preselectedOp;
-  }
-
-  final ops = [
-    {'name': 'Orange', 'sub': 'Orange CI', 'desc': 'Réseau Orange Côte d\'Ivoire'},
-    {'name': 'MTN', 'sub': 'MTN Côte d\'Ivoire', 'desc': 'Réseau MTN Côte d\'Ivoire'},
-    {'name': 'Moov', 'sub': 'Moov Africa CI', 'desc': 'Réseau Moov Africa Côte d\'Ivoire'},
-  ];
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: const Color(0xFF081F2D),
-      body: Column(children: [
-        Container(
-          width: double.infinity,
-          decoration: const BoxDecoration(
-            gradient: LinearGradient(
-              begin: Alignment.topCenter,
-              end: Alignment.bottomCenter,
-              colors: [Color(0xFF0B273F), Color(0xFF07111F)],
-            ),
-          ),
-          padding: EdgeInsets.only(
-            top: MediaQuery.of(context).padding.top + 20,
-            left: 24,
-            right: 24,
-            bottom: 20,
-          ),
-          child: Column(children: [
-            Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
-              GestureDetector(
-                onTap: () {},
-                child: Container(
-                  width: 42,
-                  height: 42,
-                  decoration: BoxDecoration(
-                    color: Colors.white12,
-                    borderRadius: BorderRadius.circular(14),
-                  ),
-                  child: const Icon(Icons.menu_rounded, color: Colors.white, size: 22),
-                ),
-              ),
-              GestureDetector(
-                onTap: () {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                        builder: (_) => NotificationsScreen(
-                            notifications: sampleNotifications)),
-                  );
-                },
-                child: Stack(children: [
-                  Container(
-                    width: 42,
-                    height: 42,
-                    decoration: BoxDecoration(
-                      color: Colors.white12,
-                      borderRadius: BorderRadius.circular(14),
-                    ),
-                    child: const Icon(Icons.notifications_none_rounded,
-                        color: Colors.white, size: 22),
-                  ),
-                  if (sampleNotifications.where((n) => !n.read).isNotEmpty)
-                    Positioned(
-                      top: 4,
-                      right: 4,
-                      child: Container(
-                        width: 18,
-                        height: 18,
-                        decoration: const BoxDecoration(
-                            color: Color(0xFFEF4444), shape: BoxShape.circle),
-                        child: Center(
-                          child: Text(
-                            '${sampleNotifications.where((n) => !n.read).length}',
-                            style: GoogleFonts.nunito(
-                                fontSize: 10,
-                                fontWeight: FontWeight.w900,
-                                color: Colors.white),
-                          ),
-                        ),
-                      ),
-                    ),
-                ]),
-              ),
-            ]),
-            const SizedBox(height: 32),
-            Text('TRANSFER',
-                style: GoogleFonts.nunito(
-                    fontSize: 32,
-                    fontWeight: FontWeight.w900,
-                    color: Colors.white)),
-            const SizedBox(height: 4),
-            Text('ON LINE',
-                style: GoogleFonts.nunito(
-                    fontSize: 32,
-                    fontWeight: FontWeight.w900,
-                    color: AppColors.primary)),
-            const SizedBox(height: 14),
-            Text('Souscrivez ou transférez vos forfaits en toute simplicité',
-                style: GoogleFonts.nunito(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w500,
-                    color: Colors.white70),
-                textAlign: TextAlign.center),
-            const SizedBox(height: 24),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceAround,
-              children: [
-                _iconBubble(Icons.call_rounded, 'Appels'),
-                _iconBubble(Icons.public_rounded, 'Internet'),
-                _iconBubble(Icons.message_rounded, 'SMS'),
-              ],
-            ),
-          ]),
-        ),
-        Expanded(
-          child: Container(
-            width: double.infinity,
-            decoration: const BoxDecoration(
-              color: AppColors.background,
-              borderRadius: BorderRadius.only(
-                topLeft: Radius.circular(32),
-                topRight: Radius.circular(32),
-              ),
-            ),
-            padding: const EdgeInsets.fromLTRB(24, 24, 24, 0),
-            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              Text('Choisissez votre opérateur',
-                  style: GoogleFonts.nunito(
-                      fontSize: 18,
-                      fontWeight: FontWeight.w900,
-                      color: AppColors.textPrimary)),
-              const SizedBox(height: 18),
-              Expanded(
-                child: SingleChildScrollView(
-                  child: Column(children: [
-                    ...ops.map((op) => _operatorCard(op)).toList(),
-                    const SizedBox(height: 20),
-                    TolButton(
-                      label: _selected != null
-                          ? 'CONTINUER'
-                          : 'SÉLECTIONNEZ UN OPÉRATEUR',
-                      color: _selected != null ? AppColors.primary : AppColors.textHint,
-                      onTap: _selected != null ? _next : () {},
-                    ),
-                    const SizedBox(height: 20),
-                    Container(
-                      padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 16),
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(16),
-                      ),
-                      child: Row(children: [
-                        Container(
-                          width: 36,
-                          height: 36,
-                          decoration: BoxDecoration(
-                            color: AppColors.success.withOpacity(0.12),
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          child: const Icon(Icons.lock_rounded,
-                              color: AppColors.success, size: 20),
-                        ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text('Sécurisé à 100%',
-                                  style: GoogleFonts.nunito(
-                                      fontSize: 14,
-                                      fontWeight: FontWeight.w900,
-                                      color: AppColors.textPrimary)),
-                              const SizedBox(height: 2),
-                              Text('Vos transactions sont protégées',
-                                  style: GoogleFonts.nunito(
-                                      fontSize: 12,
-                                      color: AppColors.textSecondary)),
-                            ],
-                          ),
-                        ),
-                        Text('AFRITECH-CI',
-                            style: GoogleFonts.nunito(
-                                fontSize: 12,
-                                fontWeight: FontWeight.w900,
-                                color: AppColors.primary)),
-                      ]),
-                    ),
-                    const SizedBox(height: 20),
-                  ]),
-                ),
-              ),
-            ]),
-          ),
-        ),
-      ]),
-    );
-  }
-
-  Widget _iconBubble(IconData icon, String label) {
-    return Column(children: [
-      Container(
-        width: 56,
-        height: 56,
-        decoration: BoxDecoration(
-          color: Colors.white12,
-          borderRadius: BorderRadius.circular(18),
-        ),
-        child: Icon(icon, color: Colors.white, size: 26),
-      ),
-      const SizedBox(height: 8),
-      Text(label,
-          style: GoogleFonts.nunito(
-              fontSize: 12, fontWeight: FontWeight.w700, color: Colors.white70)),
-    ]);
-  }
-
-  Widget _operatorCard(Map<String, String> op) {
-    final name = op['name']!;
-    final isSelected = _selected == name;
-    final color = AppColors.operatorColor(name);
-
-    return GestureDetector(
-      onTap: () => setState(() => _selected = name),
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 220),
-        margin: const EdgeInsets.only(bottom: 14),
-        padding: const EdgeInsets.all(18),
-        decoration: BoxDecoration(
-          color: color.withOpacity(0.1),
-          borderRadius: BorderRadius.circular(18),
-          border: Border.all(
-            color: isSelected ? color : Colors.transparent,
-            width: isSelected ? 2 : 1,
-          ),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withOpacity(0.03),
-              blurRadius: 14,
-              offset: const Offset(0, 8),
-            )
-          ],
-        ),
-        child: Row(children: [
-          Container(
-            width: 56,
-            height: 56,
-            decoration: BoxDecoration(
-              color: color,
-              borderRadius: BorderRadius.circular(16),
-            ),
-            child: Center(
-              child: Text(
-                name == 'Orange' ? 'o' : name,
-                style: GoogleFonts.nunito(
-                    fontSize: name == 'MTN' ? 18 : 16,
-                    fontWeight: FontWeight.w900,
-                    color: Colors.white),
-              ),
-            ),
-          ),
-          const SizedBox(width: 16),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(name,
-                    style: GoogleFonts.nunito(
-                        fontSize: 18,
-                        fontWeight: FontWeight.w900,
-                        color: AppColors.textPrimary)),
-                const SizedBox(height: 4),
-                Text(op['sub']!,
-                    style: GoogleFonts.nunito(
-                        fontSize: 12,
-                        fontWeight: FontWeight.w700,
-                        color: AppColors.textPrimary)),
-                const SizedBox(height: 2),
-                Text(op['desc']!,
-                    style: GoogleFonts.nunito(
-                        fontSize: 11, color: AppColors.textSecondary)),
-              ],
-            ),
-          ),
-          Icon(isSelected ? Icons.check_circle_rounded : Icons.arrow_forward_ios_rounded,
-              size: 22,
-              color: isSelected ? color : AppColors.textHint),
-        ]),
-      ),
-    );
-  }
-
-  void _next() {
+  void _goToStep2(BuildContext context, String op) {
     Navigator.push(
       context,
       MaterialPageRoute(
         builder: (_) => Step2ServiceScreen(
-          operator: _selected!,
-          onTransactionAdded: widget.onTransactionAdded,
+          operator: op,
+          onTransactionAdded: onTransactionAdded,
+        ),
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    // Si un opérateur est présélectionné, naviguer directement vers Step2
+    if (preselectedOp != null) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _goToStep2(context, preselectedOp!);
+      });
+    }
+
+    final unread = sampleNotifications.where((n) => !n.read).length;
+
+    return Scaffold(
+      body: Container(
+        width: double.infinity,
+        height: double.infinity,
+        decoration: const BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+            colors: [
+              Color(0xFF03100A),
+              Color(0xFF071E10),
+              Color(0xFF0A2A15),
+              Color(0xFF071E10),
+              Color(0xFF03100A),
+            ],
+          ),
+        ),
+        child: SafeArea(
+          child: Column(
+            children: [
+              // ── Cloche de notification (haut droite) ──
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.end,
+                  children: [
+                    GestureDetector(
+                      onTap: () => Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => NotificationsScreen(
+                              notifications: sampleNotifications),
+                        ),
+                      ),
+                      child: Container(
+                        width: 44,
+                        height: 44,
+                        decoration: BoxDecoration(
+                          color: Colors.white.withValues(alpha: 0.08),
+                          shape: BoxShape.circle,
+                          border: Border.all(
+                              color: Colors.white.withValues(alpha: 0.15)),
+                        ),
+                        child: Stack(
+                          children: [
+                            const Center(
+                              child: Icon(Icons.notifications_outlined,
+                                  color: Colors.white, size: 22),
+                            ),
+                            if (unread > 0)
+                              Positioned(
+                                top: 6,
+                                right: 6,
+                                child: Container(
+                                  width: 16,
+                                  height: 16,
+                                  decoration: const BoxDecoration(
+                                      color: AppColors.primary,
+                                      shape: BoxShape.circle),
+                                  child: Center(
+                                    child: Text('$unread',
+                                        style: const TextStyle(
+                                            fontSize: 9,
+                                            color: Colors.white,
+                                            fontWeight: FontWeight.w900)),
+                                  ),
+                                ),
+                              ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+
+              const Spacer(flex: 1),
+
+              // ── Logo circulaire (flèches orange/vertes) ──
+              Container(
+                width: 72,
+                height: 72,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  border: Border.all(
+                      color: AppColors.orange.withValues(alpha: 0.8), width: 3),
+                ),
+                child: Stack(
+                  alignment: Alignment.center,
+                  children: [
+                    Container(
+                      width: 58,
+                      height: 58,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: Colors.white.withValues(alpha: 0.05),
+                      ),
+                    ),
+                    // Flèches circulaires
+                    const Icon(Icons.sync_rounded,
+                        color: AppColors.success, size: 36),
+                  ],
+                ),
+              ).animate().scale(duration: 600.ms, curve: Curves.elasticOut),
+
+              const SizedBox(height: 14),
+
+              // ── Titre principal ──
+              Text('TRANSFER',
+                  style: GoogleFonts.nunito(
+                      fontSize: 34,
+                      fontWeight: FontWeight.w900,
+                      color: Colors.white,
+                      letterSpacing: 1.5))
+                  .animate(delay: 100.ms)
+                  .fadeIn(duration: 400.ms)
+                  .slideY(begin: 0.2, end: 0),
+
+              Text('ON LINE',
+                  style: GoogleFonts.nunito(
+                      fontSize: 34,
+                      fontWeight: FontWeight.w900,
+                      color: AppColors.success,
+                      letterSpacing: 1.5))
+                  .animate(delay: 150.ms)
+                  .fadeIn(duration: 400.ms)
+                  .slideY(begin: 0.2, end: 0),
+
+              const SizedBox(height: 8),
+
+              Text(
+                'Souscrivez ou transférez\nvos forfaits en toute simplicité',
+                style: GoogleFonts.nunito(
+                    fontSize: 13,
+                    color: Colors.white60,
+                    height: 1.5),
+                textAlign: TextAlign.center,
+              ).animate(delay: 200.ms).fadeIn(duration: 400.ms),
+
+              const Spacer(flex: 1),
+
+              // ── Icônes de service avec glow ──
+              Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  _serviceIcon(Icons.phone_rounded),
+                  const SizedBox(width: 28),
+                  _serviceIcon(Icons.language_rounded),
+                  const SizedBox(width: 28),
+                  _serviceIcon(Icons.message_rounded),
+                ],
+              ).animate(delay: 300.ms).fadeIn(duration: 500.ms),
+
+              const Spacer(flex: 1),
+
+              // ── Label opérateur ──
+              Text(
+                'Choisissez votre opérateur',
+                style: GoogleFonts.nunito(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w700,
+                    color: Colors.white70),
+              ).animate(delay: 400.ms).fadeIn(),
+
+              const SizedBox(height: 14),
+
+              // ── Cartes opérateurs ──
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                child: Column(
+                  children: [
+                    _opCard(context, 'Orange', AppColors.orange,
+                            'assets/images/Orange_logo.png')
+                        .animate(delay: 450.ms)
+                        .fadeIn(duration: 300.ms)
+                        .slideX(begin: -0.05, end: 0),
+                    const SizedBox(height: 12),
+                    _opCard(context, 'MTN', AppColors.mtn,
+                            'assets/images/mtn.jpg')
+                        .animate(delay: 520.ms)
+                        .fadeIn(duration: 300.ms)
+                        .slideX(begin: -0.05, end: 0),
+                    const SizedBox(height: 12),
+                    _opCard(context, 'Moov', AppColors.moov,
+                            'assets/images/moov.jpeg', logoWhiteBg: false)
+                        .animate(delay: 590.ms)
+                        .fadeIn(duration: 300.ms)
+                        .slideX(begin: -0.05, end: 0),
+                  ],
+                ),
+              ),
+
+              const Spacer(flex: 1),
+
+              // ── Badge sécurité ──
+              Column(
+                children: [
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      const Icon(Icons.verified_user_outlined,
+                          color: AppColors.success, size: 14),
+                      const SizedBox(width: 6),
+                      Text('Sécurisé à 100%',
+                          style: GoogleFonts.nunito(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w800,
+                              color: Colors.white70)),
+                    ],
+                  ),
+                  const SizedBox(height: 2),
+                  Text('Vos transactions sont protégées',
+                      style: GoogleFonts.nunito(
+                          fontSize: 11, color: Colors.white38)),
+                ],
+              ).animate(delay: 700.ms).fadeIn(),
+
+              const SizedBox(height: 10),
+
+              // ── AFRITECH-CI ──
+              Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  const Icon(Icons.shield_outlined,
+                      color: AppColors.success, size: 14),
+                  const SizedBox(width: 6),
+                  Text('AFRITECH-CI',
+                      style: GoogleFonts.nunito(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w900,
+                          color: AppColors.success,
+                          letterSpacing: 2)),
+                ],
+              ).animate(delay: 800.ms).fadeIn(),
+
+              const SizedBox(height: 16),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  // Icône de service avec cercle vert et glow
+  Widget _serviceIcon(IconData icon) {
+    return Container(
+      width: 52,
+      height: 52,
+      decoration: BoxDecoration(
+        color: AppColors.success.withValues(alpha: 0.2),
+        shape: BoxShape.circle,
+        boxShadow: [
+          BoxShadow(
+            color: AppColors.success.withValues(alpha: 0.35),
+            blurRadius: 16,
+            spreadRadius: 2,
+          ),
+        ],
+      ),
+      child: Icon(icon, color: AppColors.success, size: 24),
+    );
+  }
+
+  // Carte opérateur cliquable avec fond coloré + vrai logo
+  Widget _opCard(
+      BuildContext context, String name, Color bgColor, String imagePath,
+      {bool logoWhiteBg = true}) {
+    return GestureDetector(
+      onTap: () => _goToStep2(context, name),
+      child: Container(
+        height: 68,
+        decoration: BoxDecoration(
+          color: bgColor,
+          borderRadius: BorderRadius.circular(16),
+        ),
+        child: Row(
+          children: [
+            const SizedBox(width: 12),
+            // Logo dans carré arrondi
+            Container(
+              width: 46,
+              height: 46,
+              decoration: BoxDecoration(
+                color: logoWhiteBg ? Colors.white : Colors.transparent,
+                borderRadius: BorderRadius.circular(12),
+              ),
+              clipBehavior: Clip.antiAlias,
+              child: Image.asset(
+                imagePath,
+                fit: BoxFit.contain,
+                errorBuilder: (_, __, ___) => Icon(Icons.business_rounded,
+                    color: Colors.white, size: 28),
+              ),
+            ),
+            const SizedBox(width: 16),
+            Expanded(
+              child: Text(
+                name,
+                style: GoogleFonts.nunito(
+                    fontSize: 20,
+                    fontWeight: FontWeight.w900,
+                    color: Colors.white),
+              ),
+            ),
+            const Icon(Icons.arrow_forward_ios_rounded,
+                color: Colors.white, size: 20),
+            const SizedBox(width: 18),
+          ],
         ),
       ),
     );
